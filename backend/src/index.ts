@@ -32,19 +32,35 @@ app.use(rateLimit({
   max: 100,
 }));
 
-const rawOrigins = process.env.FRONTEND_URL || 'http://localhost:3000';
-const allowedOrigins = rawOrigins.split(',').map((s) => s.trim());
+const rawOrigins = process.env.FRONTEND_URL || '';
+const allowedOrigins = rawOrigins ? rawOrigins.split(',').map((s) => s.trim()) : [];
 app.use(
   cors({
     origin: (origin, callback) => {
-  
+      // allow non-browser or same-origin requests
       if (!origin) return callback(null, true);
+      // if no FRONTEND_URL configured, allow the incoming origin (useful on Render)
+      if (allowedOrigins.length === 0) return callback(null, true);
       if (allowedOrigins.indexOf(origin) !== -1) return callback(null, true);
       callback(new Error('CORS policy does not allow this origin.'), false);
     },
     credentials: true,
   })
 );
+
+// Content Security Policy to permit Google Identity Services and API connections
+app.use((req, res, next) => {
+  const csp = [
+    "default-src 'self'",
+    "script-src 'self' https://accounts.google.com https://apis.google.com 'unsafe-inline'",
+    "connect-src 'self' https://accounts.google.com https://oauth2.googleapis.com",
+    "img-src 'self' data:",
+    "style-src 'self' 'unsafe-inline'",
+    "frame-src https://accounts.google.com",
+  ].join('; ');
+  res.setHeader('Content-Security-Policy', csp);
+  next();
+});
 
 mongoose.connect(process.env.MONGO_URI as string)
   .then(() => console.log('Connected to MongoDB'))
@@ -238,7 +254,19 @@ if (process.env.NODE_ENV === "production") {
     app.use(express.static(frontendPath));
 
     app.get("*", (req, res) => {
-      res.sendFile(path.join(frontendPath, "index.html"));
+      const indexFile = path.join(frontendPath, "index.html");
+      if (fs.existsSync(indexFile)) {
+        let html = fs.readFileSync(indexFile, 'utf8');
+        // Inject runtime env for REACT_APP_GOOGLE_CLIENT_ID if present
+        const googleClientId = process.env.REACT_APP_GOOGLE_CLIENT_ID || process.env.GOOGLE_CLIENT_ID || '';
+        if (googleClientId) {
+          const inject = `<script>window.__ENV = window.__ENV || {}; window.__ENV.REACT_APP_GOOGLE_CLIENT_ID = '${googleClientId}';</script>`;
+          html = html.replace('</head>', `${inject}</head>`);
+        }
+        res.send(html);
+      } else {
+        res.sendFile(path.join(frontendPath, "index.html"));
+      }
     });
   } else {
     console.warn('Frontend build not found in any of:', possiblePaths);
