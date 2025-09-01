@@ -7,7 +7,7 @@ import { GoogleOAuthProvider } from '@react-oauth/google';
 
 function App() {
   let googleClientId = process.env.REACT_APP_GOOGLE_CLIENT_ID;
-  // allow runtime injection from server (window.__ENV) when build-time var isn't set
+ 
   if (!googleClientId && typeof window !== 'undefined' && (window as any).__ENV?.REACT_APP_GOOGLE_CLIENT_ID) {
     googleClientId = (window as any).__ENV.REACT_APP_GOOGLE_CLIENT_ID;
   }

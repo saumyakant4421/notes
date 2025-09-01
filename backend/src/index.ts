@@ -37,9 +37,8 @@ const allowedOrigins = rawOrigins ? rawOrigins.split(',').map((s) => s.trim()) :
 app.use(
   cors({
     origin: (origin, callback) => {
-      // allow non-browser or same-origin requests
       if (!origin) return callback(null, true);
-      // if no FRONTEND_URL configured, allow the incoming origin (useful on Render)
+
       if (allowedOrigins.length === 0) return callback(null, true);
       if (allowedOrigins.indexOf(origin) !== -1) return callback(null, true);
       callback(new Error('CORS policy does not allow this origin.'), false);
@@ -48,7 +47,7 @@ app.use(
   })
 );
 
-// Content Security Policy to permit Google Identity Services and API connections
+
 app.use((req, res, next) => {
   const csp = [
     "default-src 'self'",
