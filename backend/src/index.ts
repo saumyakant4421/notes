@@ -1,6 +1,8 @@
 import express, { Request, Response, NextFunction } from 'express';
 import mongoose from 'mongoose';
 import cors from 'cors';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
 import jwt from 'jsonwebtoken';
 import nodemailer from 'nodemailer';
@@ -14,10 +16,33 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 app.use(express.json());
-app.use(cors({ 
-  origin: 'http://localhost:3000',
-  credentials: true 
+
+
+if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1);
+}
+
+app.use(helmet());
+
+// Basic rate limiting
+app.use(rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100,
 }));
+
+const rawOrigins = process.env.FRONTEND_URL || 'http://localhost:3000';
+const allowedOrigins = rawOrigins.split(',').map((s) => s.trim());
+app.use(
+  cors({
+    origin: (origin, callback) => {
+  
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.indexOf(origin) !== -1) return callback(null, true);
+      callback(new Error('CORS policy does not allow this origin.'), false);
+    },
+    credentials: true,
+  })
+);
 
 mongoose.connect(process.env.MONGO_URI as string)
   .then(() => console.log('Connected to MongoDB'))
