@@ -7,7 +7,7 @@
   "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
   "build": "npm ci --include=dev && tsc",
   "start": "node dist/index.js",
-  "postinstall": "node ./scripts/postinstall.js"
+  "copy-build": "cp -r ../frontend/build ./build || true"
   },
   "keywords": [],
   "author": "",

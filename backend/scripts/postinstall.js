@@ -2,8 +2,8 @@ const { execSync } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 
-if (process.env.CI === 'true') {
-  console.log('CI environment detected, skipping frontend build.');
+if (process.env.CI === 'true' || process.env.RENDER === 'true') {
+  console.log('CI or Render environment detected, skipping frontend build.');
   process.exit(0);
 }
 
