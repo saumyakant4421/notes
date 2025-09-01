@@ -10,6 +10,7 @@ import { OAuth2Client } from 'google-auth-library';
 import User from './models/User';
 import Note from './models/Note';
 import path from "path";
+import fs from 'fs';
 
 dotenv.config();
 
@@ -225,12 +226,23 @@ app.delete('/api/notes/:id', authMiddleware, async (req: Request, res: Response)
 });
 
 if (process.env.NODE_ENV === "production") {
-  const frontendPath = path.join(__dirname, "../../frontend/build");
-  app.use(express.static(frontendPath));
+  const possiblePaths = [
+    path.join(__dirname, "../../frontend/build"), 
+    path.join(__dirname, "../build"), 
+    path.join(__dirname, "../../backend/build"),
+  ];
 
-  app.get("*", (req, res) => {
-    res.sendFile(path.join(frontendPath, "index.html"));
-  });
+  const frontendPath = possiblePaths.find(p => fs.existsSync(p));
+
+  if (frontendPath) {
+    app.use(express.static(frontendPath));
+
+    app.get("*", (req, res) => {
+      res.sendFile(path.join(frontendPath, "index.html"));
+    });
+  } else {
+    console.warn('Frontend build not found in any of:', possiblePaths);
+  }
 }
 
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
