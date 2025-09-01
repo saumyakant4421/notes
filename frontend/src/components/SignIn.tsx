@@ -15,6 +15,7 @@ const SignIn: React.FC = () => {
   const [error, setError] = useState('');
   const [keepLoggedIn, setKeepLoggedIn] = useState(false);
   const navigate = useNavigate();
+  const googleClientId = process.env.REACT_APP_GOOGLE_CLIENT_ID || (typeof window !== 'undefined' && (window as any).__ENV?.REACT_APP_GOOGLE_CLIENT_ID) || '';
 
   const handleSendOTP = async () => {
     if (!email) {
@@ -87,13 +88,15 @@ const SignIn: React.FC = () => {
             </div>
             <button onClick={handleSendOTP} className="primary-button">Get OTP</button>
             <div className="google-login-container">
-              <GoogleLogin
-                onSuccess={handleGoogleSuccess}
-                onError={handleGoogleError}
-                text="signin_with"
-                shape="rectangular"
-                theme="outline"
-              />
+              {googleClientId && (
+                <GoogleLogin
+                  onSuccess={handleGoogleSuccess}
+                  onError={handleGoogleError}
+                  text="signin_with"
+                  shape="rectangular"
+                  theme="outline"
+                />
+              )}
             </div>
           </div>
         ) : (

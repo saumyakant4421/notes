@@ -17,6 +17,7 @@ const SignUp: React.FC = () => {
   const [step, setStep] = useState(1); 
   const [error, setError] = useState('');
   const navigate = useNavigate();
+  const googleClientId = process.env.REACT_APP_GOOGLE_CLIENT_ID || (typeof window !== 'undefined' && (window as any).__ENV?.REACT_APP_GOOGLE_CLIENT_ID) || '';
 
   const handleSendOTP = async () => {
     if (!name || !dob || !email) {
@@ -105,13 +106,15 @@ const SignUp: React.FC = () => {
             </div>
             <button onClick={handleSendOTP} className="primary-button">Get OTP</button>
             <div className="google-login-container">
-              <GoogleLogin
-                onSuccess={handleGoogleSuccess}
-                onError={handleGoogleError}
-                text="signup_with"
-                shape="rectangular"
-                theme="outline"
-              />
+              {googleClientId && (
+                <GoogleLogin
+                  onSuccess={handleGoogleSuccess}
+                  onError={handleGoogleError}
+                  text="signup_with"
+                  shape="rectangular"
+                  theme="outline"
+                />
+              )}
             </div>
           </div>
         ) : (
