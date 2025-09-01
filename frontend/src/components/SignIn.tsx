@@ -4,7 +4,9 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import '../styles/styles.css';
 
-const API_BASE_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000';
+const API_BASE_URL = process.env.NODE_ENV === 'production'
+  ? ''
+  : (process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000');
 
 const SignIn: React.FC = () => {
   const [email, setEmail] = useState('');

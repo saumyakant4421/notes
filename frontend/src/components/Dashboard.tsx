@@ -4,7 +4,9 @@ import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import '../styles/styles.css';
 
-const API_BASE_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000';
+const API_BASE_URL = process.env.NODE_ENV === 'production'
+  ? ''
+  : (process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000');
 
 const Dashboard: React.FC = () => {
   const [user, setUser] = useState<{ name: string; email: string } | null>(null);
