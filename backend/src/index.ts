@@ -9,6 +9,7 @@ import nodemailer from 'nodemailer';
 import { OAuth2Client } from 'google-auth-library';
 import User from './models/User';
 import Note from './models/Note';
+import path from "path";
 
 dotenv.config();
 
@@ -222,5 +223,14 @@ app.delete('/api/notes/:id', authMiddleware, async (req: Request, res: Response)
     res.status(500).json({ error: 'Failed to delete note' });
   }
 });
+
+if (process.env.NODE_ENV === "production") {
+  const frontendPath = path.join(__dirname, "../../frontend/build");
+  app.use(express.static(frontendPath));
+
+  app.get("*", (req, res) => {
+    res.sendFile(path.join(frontendPath, "index.html"));
+  });
+}
 
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
