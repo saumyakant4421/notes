@@ -1,0 +1,187 @@
+import express, { Request, Response, NextFunction } from 'express';
+import mongoose from 'mongoose';
+import cors from 'cors';
+import dotenv from 'dotenv';
+import jwt from 'jsonwebtoken';
+import nodemailer from 'nodemailer';
+import { OAuth2Client } from 'google-auth-library';
+import User from './models/User';
+import Note from './models/Note';
+
+dotenv.config();
+
+const app = express();
+const PORT = process.env.PORT || 5000;
+
+app.use(express.json());
+app.use(cors({ origin: process.env.FRONTEND_URL }));
+
+mongoose.connect(process.env.MONGO_URI as string)
+  .then(() => console.log('Connected to MongoDB'))
+  .catch(err => console.error('DB connection error:', err));
+
+// OTP transporter
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: { user: process.env.GMAIL_USER, pass: process.env.GMAIL_PASS },
+});
+
+
+const otps: { [email: string]: string } = {};
+
+// Generation of 6-digit OTP
+const generateOTP = (): string => Math.floor(100000 + Math.random() * 900000).toString();
+
+
+const authMiddleware = (req: Request, res: Response, next: NextFunction) => {
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token) return res.status(401).json({ error: 'No token provided' });
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET as string);
+    (req as any).user = decoded;
+    next();
+  } catch (err) {
+    res.status(401).json({ error: 'Invalid token' });
+  }
+};
+
+// Sign Up: Send OTP
+app.post('/api/signup', async (req: Request, res: Response) => {
+  const { name, dob, email } = req.body;
+  if (!name || !dob || !email) return res.status(400).json({ error: 'All fields required' });
+  if (!/^\S+@\S+\.\S+$/.test(email)) return res.status(400).json({ error: 'Invalid email format' });
+
+  const existingUser = await User.findOne({ email });
+  if (existingUser) return res.status(409).json({ error: 'User already exists' });
+
+  const otp = generateOTP();
+  otps[email] = otp;
+
+  try {
+    await transporter.sendMail({
+      to: email,
+      subject: 'HD Notes Sign Up OTP',
+      text: `Your OTP is ${otp}. It expires in 10 minutes.`,
+    });
+    res.json({ message: 'OTP sent to email' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to send email' });
+  }
+});
+
+// Sign Up- Verify OTP
+app.post('/api/verify-signup', async (req: Request, res: Response) => {
+  const { email, otp, name, dob } = req.body;
+  if (otps[email] !== otp) return res.status(400).json({ error: 'Invalid or expired OTP' });
+  try {
+    const user = new User({ name, dob: new Date(dob), email });
+    await user.save();
+    const token = jwt.sign({ id: user._id, email: user.email }, process.env.JWT_SECRET as string, { expiresIn: '1h' });
+    delete otps[email];
+    res.json({ token, user: { name: user.name, email: user.email } });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to create user' });
+  }
+});
+
+// Login: Send OTP
+app.post('/api/login', async (req: Request, res: Response) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ error: 'Email required' });
+
+  const user = await User.findOne({ email });
+  if (!user) return res.status(404).json({ error: 'User not found' });
+
+  const otp = generateOTP();
+  otps[email] = otp;
+
+  try {
+    await transporter.sendMail({
+      to: email,
+      subject: 'HD Notes Login OTP',
+      text: `Your OTP is ${otp}. It expires in 10 minutes.`,
+    });
+    res.json({ message: 'OTP sent to email' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to send email' });
+  }
+});
+
+// Login: Verify OTP
+app.post('/api/verify-login', async (req: Request, res: Response) => {
+  const { email, otp } = req.body;
+  if (otps[email] !== otp) return res.status(400).json({ error: 'Invalid or expired OTP' });
+
+  const user = await User.findOne({ email });
+  if (!user) return res.status(404).json({ error: 'User not found' });
+
+  const token = jwt.sign({ id: user._id, email: user.email }, process.env.JWT_SECRET as string, { expiresIn: '1h' });
+  delete otps[email];
+  res.json({ token, user: { name: user.name, email: user.email } });
+});
+
+// Google Auth
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+app.post('/api/google-auth', async (req: Request, res: Response) => {
+  const { token } = req.body; 
+  try {
+    const ticket = await googleClient.verifyIdToken({
+      idToken: token,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+    const payload = ticket.getPayload();
+    if (!payload || !payload.email) return res.status(400).json({ error: 'Invalid Google token' });
+
+    let user = await User.findOne({ email: payload.email });
+    if (!user) {
+      user = new User({
+        name: payload.name || 'Google User',
+        email: payload.email,
+        googleId: payload.sub,
+        dob: new Date(), 
+      });
+      await user.save();
+    }
+    const jwtToken = jwt.sign({ id: user._id, email: user.email }, process.env.JWT_SECRET as string, { expiresIn: '1h' });
+    res.json({ token: jwtToken, user: { name: user.name, email: user.email } });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Google authentication failed' });
+  }
+});
+
+// Notes Routes
+app.get('/api/notes', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const notes = await Note.find({ userId: (req as any).user.id }).sort({ createdAt: -1 });
+    res.json(notes);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch notes' });
+  }
+});
+
+app.post('/api/notes', authMiddleware, async (req: Request, res: Response) => {
+  const { content } = req.body;
+  if (!content) return res.status(400).json({ error: 'Content required' });
+  try {
+    const note = new Note({ userId: (req as any).user.id, content });
+    await note.save();
+    res.status(201).json(note);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to create note' });
+  }
+});
+
+app.delete('/api/notes/:id', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const note = await Note.findOneAndDelete({ _id: req.params.id, userId: (req as any).user.id });
+    if (!note) return res.status(404).json({ error: 'Note not found or unauthorized' });
+    res.json({ message: 'Note deleted' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to delete note' });
+  }
+});
+
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
