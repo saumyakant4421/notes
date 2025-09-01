@@ -1,11 +1,36 @@
 import React from 'react';
-// import logo from './logo.svg';
-import './App.css';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import SignUp from './components/SignUp';
+import SignIn from './components/SignIn';
+import Dashboard from './components/Dashboard';
+import { GoogleOAuthProvider } from '@react-oauth/google';
 
 function App() {
+  const googleClientId = process.env.REACT_APP_GOOGLE_CLIENT_ID;
+  
   return (
-    <div className="App">
-          Learn React
+    <div>
+      {googleClientId ? (
+        <GoogleOAuthProvider clientId={googleClientId}>
+          <Router>
+            <Routes>
+              <Route path="/signup" element={<SignUp />} />
+              <Route path="/signin" element={<SignIn />} />
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/" element={<SignIn />} />
+            </Routes>
+          </Router>
+        </GoogleOAuthProvider>
+      ) : (
+        <Router>
+          <Routes>
+            <Route path="/signup" element={<SignUp />} />
+            <Route path="/signin" element={<SignIn />} />
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/" element={<SignIn />} />
+          </Routes>
+        </Router>
+      )}
     </div>
   );
 }

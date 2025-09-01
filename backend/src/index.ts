@@ -14,7 +14,10 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 app.use(express.json());
-app.use(cors({ origin: process.env.FRONTEND_URL }));
+app.use(cors({ 
+  origin: 'http://localhost:3000',
+  credentials: true 
+}));
 
 mongoose.connect(process.env.MONGO_URI as string)
   .then(() => console.log('Connected to MongoDB'))
@@ -149,6 +152,17 @@ app.post('/api/google-auth', async (req: Request, res: Response) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Google authentication failed' });
+  }
+});
+
+// Get current user info
+app.get('/api/me', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const user = await User.findById((req as any).user.id).select('-__v');
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    res.json({ name: user.name, email: user.email });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch user data' });
   }
 });
 
