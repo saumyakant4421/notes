@@ -242,6 +242,9 @@ if (process.env.NODE_ENV === "production") {
     });
   } else {
     console.warn('Frontend build not found in any of:', possiblePaths);
+    app.get('/', (req, res) => {
+      res.status(200).send(`<html><head><title>Notes</title></head><body style="font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;margin:40px;"><h1>Notes backend running</h1><p>The frontend build was not found on the server. The server is running but static assets are missing.</p><p>Expected one of: <ul>${possiblePaths.map(p=>`<li>${p}</li>`).join('')}</ul></p></body></html>`);
+    });
   }
 }
 
